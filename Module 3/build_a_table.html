@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Build a table</title>
+</head>
+<body>
+    <h1>Mountains</h1>
+    <div id="mountains">
+
+    </div>
+ 
+
+    <script>
+        const MOUNTAINS = [
+            {name: "Kilimanjaro", height: 5895, place: "Tanzania"},
+            {name: "Everest", height: 8848, place: "Nepal"},
+            {name: "Mount Fuji", height: 3776, place: "Japan"},
+            {name: "Vaalserberg", height: 323, place: "Netherlands"},
+            {name: "Denali", height: 6168, place: "United States"},
+            {name: "Popocatepetl", height: 5465, place: "Mexico"},
+            {name: "Mont Blanc", height: 4808, place: "Italy/France"}
+        ];
+
+        // Get the header to be used for the table head
+        const headers = Object.keys(MOUNTAINS[0])
+
+
+        // create the table and its components
+        const table = document.createElement("table")
+        const thead = document.createElement("thead")
+        const tbody = document.createElement("tbody")
+        
+
+        // create the tr and add the header items
+        const headerRow = document.createElement("tr")
+        headers.forEach(header =>{
+            // create th
+            const th = document.createElement("th")
+            th.textContent = header
+            headerRow.appendChild(th)
+        })
+
+        // add header row into thead
+        thead.appendChild(headerRow)
+
+        // add thead to table
+        table.appendChild(thead)
+
+        // loop through the object
+        MOUNTAINS.forEach(obj =>{
+            const dataRow = document.createElement("tr")
+            headers.forEach(key =>{
+                const td = document.createElement("td")
+                td.textContent = obj[key]
+                dataRow.appendChild(td)
+            })
+           tbody.appendChild(dataRow)
+        })
+        table.appendChild(tbody)
+  
+        document.getElementById("mountains").appendChild(table)
+
+        
+    </script>
+</body>
+</html>
