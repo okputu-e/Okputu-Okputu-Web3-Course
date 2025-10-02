@@ -56,6 +56,7 @@ async function getAccount() {
         console.error(err);
       }
     });
+  console.log(accounts);
   const account = accounts[0];
   showAccount.innerHTML = account;
 }

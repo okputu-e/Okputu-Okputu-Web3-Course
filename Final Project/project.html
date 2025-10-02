@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simple Ethers.js DApp</title>
+ <style>
+ body {
+  font-family: Inter, system-ui, sans-serif;
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 0 20px;
+  color: #111;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+button {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #fff;
+  cursor: pointer;
+}
+.card {
+  padding: 18px;
+  margin-top: 18px;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+}
+label {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  color: #444;
+}
+input[type="text"],
+input[type="number"] {
+  width: 100%;
+  padding: 8px;
+  margin-top: 6px;
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+}
+.muted {
+  color: #666;
+  font-size: 13px;
+}
+#status {
+  margin-top: 10px;
+  font-size: 14px;
+}
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+ </style>
+  <!-- Ethers v5 UMD build via CDN (works for this example) -->
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+
+</head>
+<body>
+  <header>
+    <h1>Simple Ethers.js DApp</h1>
+    <button id="connectBtn">Connect Wallet</button>
+  </header>
+
+  <div class="card">
+    <div><strong>Account</strong></div>
+    <div id="account" class="muted">Not connected</div>
+    <div style="margin-top:8px;"><strong>Balance</strong></div>
+    <div id="balance" class="muted">--</div>
+  </div>
+
+  <div class="card">
+    <h3>Send ETH</h3>
+    <label>Recipient address</label>
+    <input id="toAddress" type="text" placeholder="0x..." />
+    <label>Amount (ETH)</label>
+    <input id="amount" type="text" placeholder="0.01" />
+    <div class="row" style="margin-top:12px;">
+      <button id="sendBtn">Send</button>
+      <div id="status" class="muted">Status: idle</div>
+    </div>
+  </div>
+
+  <script>
+    // Globals
+    let provider;    // ethers provider (wraps window.ethereum)
+    let signer;      // ethers signer (connected account)
+    const connectBtn = document.getElementById('connectBtn');
+    const accountEl = document.getElementById('account');
+    const balanceEl = document.getElementById('balance');
+    const statusEl  = document.getElementById('status');
+
+    // UTIL: short address
+    function shortAddr(addr){
+      if(!addr) return '';
+      return addr.slice(0,6) + '...' + addr.slice(-4);
+    }
+
+    // Connect wallet
+    async function connectWallet(){
+      if(!window.ethereum){
+        alert('MetaMask (or another injected wallet) not found. Install MetaMask and try again.');
+        return;
+      }
+
+      try {
+        // Wrap injected provider with ethers.js
+        provider = new ethers.providers.Web3Provider(window.ethereum, "any"); // "any" prevents automatic chain switching
+        // Request account access
+        await provider.send("eth_requestAccounts", []);
+        signer = provider.getSigner();
+        const address = await signer.getAddress();
+        accountEl.textContent = shortAddr(address) + ' — ' + address;
+        connectBtn.textContent = 'Connected';
+        await refreshBalance();
+
+        // Listen for account and chain changes
+        window.ethereum.on('accountsChanged', handleAccountsChanged);
+        window.ethereum.on('chainChanged', handleChainChanged);
+      } catch (err) {
+        console.error(err);
+        alert('Connection failed: ' + (err.message || err));
+      }
+    }
+
+    // Refresh displayed ETH balance
+    async function refreshBalance(){
+      try {
+        if(!signer) { balanceEl.textContent = '--'; return; }
+        const addr = await signer.getAddress();
+        const bal = await provider.getBalance(addr);
+        balanceEl.textContent = ethers.utils.formatEther(bal) + ' ETH';
+      } catch (err) {
+        console.error('balance error', err);
+        balanceEl.textContent = 'Error';
+      }
+    }
+
+    // Send ETH
+    async function sendETH(){
+      if(!signer){
+        alert('Wallet not connected. Click "Connect Wallet" first.');
+        return;
+      }
+      const to = document.getElementById('toAddress').value.trim();
+      const amount = document.getElementById('amount').value.trim();
+
+      // Basic validation
+      if(!ethers.utils.isAddress(to)){
+        alert('Invalid recipient address.');
+        return;
+      }
+      if(!amount || Number(amount) <= 0){
+        alert('Enter a valid amount.');
+        return;
+      }
+
+      try {
+        statusEl.textContent = 'Status: sending transaction...';
+        // Create and send transaction
+        const txResponse = await signer.sendTransaction({
+          to,
+          value: ethers.utils.parseEther(amount)
+        });
+
+        statusEl.textContent = 'Status: transaction sent. Hash: ' + txResponse.hash;
+        // Wait for 1 confirmation (you can await more if you want)
+        const receipt = await txResponse.wait(1);
+        statusEl.textContent = 'Status: confirmed in block ' + receipt.blockNumber + ' — ' + txResponse.hash;
+        // Update balance
+        await refreshBalance();
+      } catch (err) {
+        console.error('send error', err);
+        statusEl.textContent = 'Error: ' + (err.message || err);
+      }
+    }
+
+    // Handlers for wallet events
+    async function handleAccountsChanged(accounts){
+      if(accounts.length === 0){
+        // disconnected
+        accountEl.textContent = 'Not connected';
+        balanceEl.textContent = '--';
+        connectBtn.textContent = 'Connect Wallet';
+        signer = null;
+      } else {
+        // switched account
+        accountEl.textContent = shortAddr(accounts[0]) + ' — ' + accounts[0];
+        // rewrap signer
+        signer = provider.getSigner();
+        await refreshBalance();
+      }
+    }
+
+    async function handleChainChanged(chainId){
+      // chainId is hex string; you may want to refresh UI or prompt user
+      console.log('chain changed', chainId);
+      // Recommended: reload page to avoid subtle provider inconsistencies
+      // window.location.reload();
+      // But we can just refresh balance
+      await refreshBalance();
+    }
+
+    // Wire UI
+    connectBtn.addEventListener('click', connectWallet);
+    document.getElementById('sendBtn').addEventListener('click', sendETH);
+
+    // Optional: auto-detect if already connected (MetaMask may remember)
+    (async function init(){
+      if(window.ethereum && window.ethereum.selectedAddress){
+        // user previously connected in this browser
+        await connectWallet();
+      }
+    })();
+  </script>
+</body>
+</html>
